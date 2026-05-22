@@ -5,6 +5,36 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 /**
+ * GET /api/simulacoes/pvgis  (rota legada — redireciona para NASA POWER)
+ * Mantida para compatibilidade com builds antigos do frontend
+ */
+router.get('/pvgis', async (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) return res.status(400).json({ error: 'lat e lon são obrigatórios.' });
+
+  const params = new URLSearchParams({
+    parameters: 'ALLSKY_SFC_SW_DWN',
+    community:  'RE',
+    longitude:  parseFloat(lon).toFixed(4),
+    latitude:   parseFloat(lat).toFixed(4),
+    format:     'JSON',
+  });
+
+  try {
+    const nasaRes = await fetch(
+      `https://power.larc.nasa.gov/api/temporal/climatology/point?${params}`,
+      { headers: { 'User-Agent': 'SolarCRM/1.0' } }
+    );
+    if (!nasaRes.ok) return res.status(502).json({ error: 'NASA POWER indisponível.' });
+    const data = await nasaRes.json();
+    res.json(data);
+  } catch (err) {
+    console.error('Erro legacy pvgis→nasa:', err);
+    res.status(502).json({ error: 'Erro ao consultar NASA POWER.' });
+  }
+});
+
+/**
  * GET /api/simulacoes/nasa-power
  * Proxy server-side para a NASA POWER API — dados climatológicos de 22 anos
  * Parâmetro ALLSKY_SFC_SW_DWN = irradiância global horizontal em kWh/m²/dia
